@@ -13,6 +13,8 @@ import {
   solveNozzleFlow,
 } from '../utils/nozzleFlow'
 
+const GRID_POINTS = 300
+
 const DEFAULT_INPUTS: Quasi1DInputs = {
   Me: 2.5,
   pbBar: 1,
@@ -20,7 +22,6 @@ const DEFAULT_INPUTS: Quasi1DInputs = {
   T0: 1500,
   throatMm: 20,
   lengthMm: 200,
-  nPoints: 300,
   geometryType: 'planar',
   gamma: 1.4,
   R: 287,
@@ -40,7 +41,7 @@ export function Quasi1D() {
     const AeOverAt = exitAreaRatioFromMach(inputs.Me, inputs.gamma)
     const geometry = generateNozzleGeometry(
       L,
-      inputs.nPoints,
+      GRID_POINTS,
       AeOverAt,
       2.0,
       0.4,

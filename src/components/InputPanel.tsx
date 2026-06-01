@@ -10,7 +10,6 @@ export interface Quasi1DInputs {
   T0: number
   throatMm: number
   lengthMm: number
-  nPoints: number
   geometryType: GeometryType
   gamma: number
   R: number
@@ -109,19 +108,6 @@ export function InputPanel({
             step={10}
             value={inputs.lengthMm}
             onChange={(e) => onChange({ lengthMm: Number(e.target.value) })}
-            className="rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-300">Grid points</span>
-          <input
-            type="number"
-            min={50}
-            max={1000}
-            step={10}
-            value={inputs.nPoints}
-            onChange={(e) => onChange({ nPoints: Number(e.target.value) })}
             className="rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono"
           />
         </label>
