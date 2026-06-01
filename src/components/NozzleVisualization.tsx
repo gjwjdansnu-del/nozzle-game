@@ -85,7 +85,8 @@ export function NozzleVisualization({
   const xExit = toX(L)
   const yTop = toY(geometry.yWall[n - 1])
   const yBot = toY(-geometry.yWall[n - 1])
-  const halfH = (yTop - yBot) / 2
+  // SVG y grows downward: yTop < yBot, so use (yBot - yTop) for positive half-height
+  const halfH = (yBot - yTop) / 2
   const state = solution.state
   const pbOverPe = solution.pe > 0 ? solution.pb / solution.pe : 1
   const peOverPb = solution.pb > 0 ? solution.pe / solution.pb : 1
@@ -93,32 +94,38 @@ export function NozzleVisualization({
   const showExternalJet =
     state !== 'internal-shock' && state !== 'unstarted'
 
-  // --- Expansion fan (underexpanded): rays diverge outward from lip ---
+  // --- Expansion fan (underexpanded): rays diverge outward from lip (away from centerline) ---
   const fanStrength = Math.min(1, Math.max(0, peOverPb - 1))
   const fanSpreadMax = halfH * 0.85 * fanStrength
   const showExpansionFan = showExternalJet && pbOverPe < 0.997 && fanStrength > 0.002
+  const hExit = geometry.yWall[n - 1]
+  const mu = Math.asin(1 / Math.max(Me, 1.01))
 
   const expansionFanElements = showExpansionFan ? (
     <g>
       {Array.from({ length: FAN_RAYS }, (_, k) => {
         const frac = k / (FAN_RAYS - 1)
-        const spread = fanSpreadMax * frac
+        const turn = mu + frac * (Math.PI / 4) * fanStrength
+        const dx = jetLen * Math.cos(turn)
+        const dy = jetLen * Math.sin(turn)
         return (
           <g key={k}>
+            {/* Upper lip: turn upward in physical space → decrease SVG y */}
             <line
               x1={xExit}
-              y1={yTop}
-              x2={xExit + jetLen}
-              y2={yTop - spread}
+              y1={toY(hExit)}
+              x2={xExit + dx}
+              y2={toY(hExit) - dy}
               stroke={jetColor('expansion')}
               strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.2 : 0.7}
               opacity={0.35 + 0.55 * frac}
             />
+            {/* Lower lip: turn downward in physical space → increase SVG y */}
             <line
               x1={xExit}
-              y1={yBot}
-              x2={xExit + jetLen}
-              y2={yBot + spread}
+              y1={toY(-hExit)}
+              x2={xExit + dx}
+              y2={toY(-hExit) + dy}
               stroke={jetColor('expansion')}
               strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.2 : 0.7}
               opacity={0.35 + 0.55 * frac}
