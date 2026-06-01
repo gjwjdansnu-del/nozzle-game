@@ -29,6 +29,6 @@ Pushes to `main` trigger `.github/workflows/deploy.yml`. In the repo **Settings 
 |------|--------|
 | `/` | Home — mode selection |
 | `/quasi-1d` | Quasi-1D nozzle design (implemented) |
-| `/moc` | Coming soon |
+| `/moc` | 2D minimum-length MOC nozzle design (implemented) |
 | `/moc-bl-correction` | Coming soon |
 | `/cfd` | Coming soon |
