@@ -24,7 +24,6 @@ const DEFAULT_INPUTS: Quasi1DInputs = {
   geometryType: 'planar',
   gamma: 1.4,
   R: 287,
-  showVelocityPlot: false,
   colormap: 'mach',
 }
 
@@ -166,16 +165,14 @@ export function Quasi1D() {
               color="#4ade80"
               shockX={solution.shockX}
             />
-            {inputs.showVelocityPlot && (
-              <LinePlot
-                label="Velocity (m/s)"
-                x={solution.x}
-                y={solution.U}
-                xMax={L}
-                color="#fbbf24"
-                shockX={solution.shockX}
-              />
-            )}
+            <LinePlot
+              label="Velocity (m/s)"
+              x={solution.x}
+              y={solution.U}
+              xMax={L}
+              color="#fbbf24"
+              shockX={solution.shockX}
+            />
           </div>
         </div>
       </div>

@@ -14,7 +14,6 @@ export interface Quasi1DInputs {
   geometryType: GeometryType
   gamma: number
   R: number
-  showVelocityPlot: boolean
   colormap: 'mach' | 'pressure' | 'temperature' | 'density' | 'velocity'
 }
 
@@ -160,15 +159,6 @@ export function InputPanel({
           </select>
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input
-            type="checkbox"
-            checked={inputs.showVelocityPlot}
-            onChange={(e) => onChange({ showVelocityPlot: e.target.checked })}
-            className="accent-cyan-500"
-          />
-          Show velocity plot
-        </label>
       </div>
 
       <button
