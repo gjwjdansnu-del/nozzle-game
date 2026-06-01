@@ -165,7 +165,8 @@ function toPublicPoint(p: InternalPoint): MOCPoint {
   }
 }
 
-function runMOC(inputs: MOCInputs): InternalPoint[] {
+/** Planar 2D minimum-length MOC mesh (exported for axisymmetric refinement). */
+export function runMOC(inputs: MOCInputs): InternalPoint[] {
   const { Me, nLines, ht, gamma } = inputs
   const nPoints = countMOCPoints(nLines)
   const pts = initMOCMesh(nPoints, nLines)
