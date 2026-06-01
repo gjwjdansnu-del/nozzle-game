@@ -57,3 +57,20 @@ export function staticDensity(rho0: number, M: number, gamma: number): number {
 export function stagnationDensity(p0: number, T0: number, R: number): number {
   return p0 / (R * T0)
 }
+
+/** Invert isentropic p/p0 → Mach (subsonic branch by default). */
+export function machFromPressureRatio(
+  pr: number,
+  gamma: number,
+  supersonic = false,
+): number {
+  if (pr <= 0) return supersonic ? 1.001 : 1e-5
+  if (pr >= 1) return supersonic ? 20 : 0.999
+
+  const inner = Math.pow(pr, -((gamma - 1) / gamma)) - 1
+  if (inner <= 0) return supersonic ? 1.001 : 1e-5
+
+  const M = Math.sqrt(((2 / (gamma - 1)) * inner))
+  if (supersonic) return Math.max(1.001, M)
+  return Math.min(0.999, Math.max(1e-5, M))
+}

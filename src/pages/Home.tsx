@@ -1,9 +1,11 @@
+import { AppVersion } from '../components/AppVersion'
 import { ModeCard } from '../components/ModeCard'
 
 export function Home() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <header className="mb-10 text-center">
+        <AppVersion className="mb-1" />
         <h1 className="text-4xl font-bold tracking-tight text-white">Nozzle Game</h1>
         <p className="mt-3 text-slate-400">
           Lightweight educational tools for rocket nozzle design — client-side quasi-1D models

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AppVersion } from '../components/AppVersion'
 import { InputPanel, type Quasi1DInputs } from '../components/InputPanel'
 import { OutputPanel } from '../components/OutputPanel'
 import { NozzleVisualization } from '../components/NozzleVisualization'
@@ -69,7 +70,10 @@ export function Quasi1D() {
           <Link to="/" className="text-sm text-cyan-500 hover:text-cyan-300">
             ← Home
           </Link>
-          <h1 className="text-lg font-semibold text-white">Quasi-1D Nozzle Design</h1>
+          <div className="flex flex-col items-center">
+            <AppVersion />
+            <h1 className="text-lg font-semibold text-white">Quasi-1D Nozzle Design</h1>
+          </div>
           <span className="w-16" />
         </div>
       </div>

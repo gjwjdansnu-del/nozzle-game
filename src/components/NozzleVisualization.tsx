@@ -1,8 +1,8 @@
-import type { FlowSolution, NozzleState } from '../utils/nozzleFlow'
+import type { FlowSolution } from '../utils/nozzleFlow'
 import { colormapRange, colormapValue } from '../utils/nozzleFlow'
 import type { ColormapVariable } from '../utils/nozzleFlow'
 import type { NozzleGeometry } from '../utils/nozzleGeometry'
-import { lipShockNormalFraction } from '../utils/obliqueShock'
+import { obliqueShockAngleDeg, obliqueShockAngleRad } from '../utils/obliqueShock'
 import {
   PLOT_JET_WIDTH,
   PLOT_PAD_LEFT,
@@ -19,16 +19,14 @@ interface NozzleVisualizationProps {
   gamma: number
 }
 
-function jetColor(state: NozzleState): string {
-  switch (state) {
-    case 'underexpanded':
+function jetColor(kind: 'expansion' | 'ideal' | 'shock'): string {
+  switch (kind) {
+    case 'expansion':
       return '#fbbf24'
-    case 'ideally-expanded':
+    case 'ideal':
       return '#34d399'
-    case 'overexpanded':
+    case 'shock':
       return '#fb923c'
-    default:
-      return '#64748b'
   }
 }
 
@@ -39,6 +37,8 @@ function sampleColor(t: number): string {
   const g = Math.round(80 + 80 * (1 - Math.abs(clamped - 0.5) * 2))
   return `rgb(${r},${g},${b})`
 }
+
+const FAN_RAYS = 7
 
 export function NozzleVisualization({
   geometry,
@@ -93,95 +93,139 @@ export function NozzleVisualization({
   const showExternalJet =
     state !== 'internal-shock' && state !== 'unstarted'
 
-  // Continuous fan spread for underexpanded (pb < pe)
-  const fanSpread = Math.min(halfH * 0.85, halfH * 0.15 * Math.max(0, peOverPb - 1))
+  // --- Expansion fan (underexpanded): rays diverge outward from lip ---
+  const fanStrength = Math.min(1, Math.max(0, peOverPb - 1))
+  const fanSpreadMax = halfH * 0.85 * fanStrength
+  const showExpansionFan = showExternalJet && pbOverPe < 0.997 && fanStrength > 0.002
 
-  // Oblique lip shock: β grows smoothly from Mach angle → 90° as pb/pe increases
-  const lipNormal = lipShockNormalFraction(Me, gamma, pbOverPe)
-  const shockDx = jetLen * Math.max(0.05, 1 - lipNormal)
-  const shockDy = halfH * 0.35 * lipNormal
-
-  const jetElements = showExternalJet ? (
+  const expansionFanElements = showExpansionFan ? (
     <g>
-      {pbOverPe < 0.997 && (
-        <>
-          <line
-            x1={xExit}
-            y1={yTop}
-            x2={xExit + jetLen}
-            y2={yTop - fanSpread}
-            stroke={jetColor('underexpanded')}
-            strokeWidth={1.2}
-            opacity={0.85}
-          />
-          <line
-            x1={xExit}
-            y1={yBot}
-            x2={xExit + jetLen}
-            y2={yBot + fanSpread}
-            stroke={jetColor('underexpanded')}
-            strokeWidth={1.2}
-            opacity={0.85}
-          />
-        </>
+      {Array.from({ length: FAN_RAYS }, (_, k) => {
+        const frac = k / (FAN_RAYS - 1)
+        const spread = fanSpreadMax * frac
+        return (
+          <g key={k}>
+            <line
+              x1={xExit}
+              y1={yTop}
+              x2={xExit + jetLen}
+              y2={yTop - spread}
+              stroke={jetColor('expansion')}
+              strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.2 : 0.7}
+              opacity={0.35 + 0.55 * frac}
+            />
+            <line
+              x1={xExit}
+              y1={yBot}
+              x2={xExit + jetLen}
+              y2={yBot + spread}
+              stroke={jetColor('expansion')}
+              strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.2 : 0.7}
+              opacity={0.35 + 0.55 * frac}
+            />
+          </g>
+        )
+      })}
+      <text
+        x={xExit + 6}
+        y={yTop - fanSpreadMax - 10}
+        className="fill-amber-300 text-[11px] font-medium"
+      >
+        Expansion fan
+      </text>
+    </g>
+  ) : null
+
+  // --- Oblique / normal lip shock (overexpanded) ---
+  const betaRad = obliqueShockAngleRad(Me, gamma, pbOverPe)
+  const betaDeg = obliqueShockAngleDeg(Me, gamma, pbOverPe)
+  const showLipShock = showExternalJet && pbOverPe > 1.001 && betaRad != null
+  const isNormalLip = betaDeg != null && betaDeg >= 85
+  const shockLen = jetLen * 0.95
+  const shockDx = betaRad != null ? shockLen * Math.cos(betaRad) : 0
+  const shockDy = betaRad != null ? shockLen * Math.sin(betaRad) : 0
+
+  const lipShockElements = showLipShock ? (
+    <g>
+      <line
+        x1={xExit}
+        y1={yTop}
+        x2={xExit + shockDx}
+        y2={yTop + shockDy}
+        stroke={jetColor('shock')}
+        strokeWidth={1.3}
+      />
+      <line
+        x1={xExit}
+        y1={yBot}
+        x2={xExit + shockDx}
+        y2={yBot - shockDy}
+        stroke={jetColor('shock')}
+        strokeWidth={1.3}
+      />
+      {isNormalLip && (
+        <line
+          x1={xExit}
+          y1={yTop}
+          x2={xExit}
+          y2={yBot}
+          stroke={jetColor('shock')}
+          strokeWidth={1.5}
+          strokeDasharray="4 2"
+        />
       )}
-      {pbOverPe >= 0.997 && pbOverPe <= 1.03 && (
+      <text
+        x={xExit + shockDx + 4}
+        y={yTop + shockDy + 12}
+        className="fill-orange-300 text-[11px] font-medium"
+      >
+        {isNormalLip ? 'Normal shock (lip)' : 'Oblique shock'}
+      </text>
+    </g>
+  ) : null
+
+  const idealJet =
+    showExternalJet && pbOverPe >= 0.997 && pbOverPe <= 1.03 ? (
+      <g>
         <rect
           x={xExit}
           y={yBot}
           width={jetLen}
           height={yTop - yBot}
-          fill={jetColor('ideally-expanded')}
+          fill={jetColor('ideal')}
           opacity={0.15}
-          stroke={jetColor('ideally-expanded')}
+          stroke={jetColor('ideal')}
           strokeWidth={0.8}
         />
-      )}
-      {pbOverPe > 1.001 && (
-        <>
-          <line
-            x1={xExit}
-            y1={yTop}
-            x2={xExit + shockDx}
-            y2={yTop + shockDy}
-            stroke={jetColor('overexpanded')}
-            strokeWidth={1.2}
-          />
-          <line
-            x1={xExit}
-            y1={yBot}
-            x2={xExit + shockDx}
-            y2={yBot - shockDy}
-            stroke={jetColor('overexpanded')}
-            strokeWidth={1.2}
-          />
-          {lipNormal > 0.55 && (
-            <line
-              x1={xExit + shockDx}
-              y1={yTop + shockDy}
-              x2={xExit + shockDx}
-              y2={yBot - shockDy}
-              stroke={jetColor('overexpanded')}
-              strokeWidth={0.8}
-              strokeDasharray="3 2"
-              opacity={0.5 + 0.5 * lipNormal}
-            />
-          )}
-        </>
-      )}
-    </g>
-  ) : null
+        <text
+          x={xExit + 6}
+          y={(yTop + yBot) / 2}
+          className="fill-emerald-300 text-[11px] font-medium"
+        >
+          Matched jet
+        </text>
+      </g>
+    ) : null
 
   const shockLine =
     solution.shockX != null ? (
-      <line
-        x1={toX(solution.shockX)}
-        y1={padY}
-        x2={toX(solution.shockX)}
-        y2={height - padY}
-        stroke="#ef4444"
-        strokeWidth={2}
-      />
+      <g>
+        <line
+          x1={toX(solution.shockX)}
+          y1={padY}
+          x2={toX(solution.shockX)}
+          y2={height - padY}
+          stroke="#ef4444"
+          strokeWidth={2}
+        />
+        <text
+          x={toX(solution.shockX) + 4}
+          y={padY + 14}
+          className="fill-red-400 text-[11px] font-medium"
+        >
+          Normal shock (internal)
+        </text>
+      </g>
     ) : null
 
   const colorbarH = 120
@@ -220,7 +264,9 @@ export function NozzleVisualization({
 
         <path d={outlineD} fill="none" stroke="#94a3b8" strokeWidth={1.5} />
         {shockLine}
-        {jetElements}
+        {expansionFanElements}
+        {idealJet}
+        {lipShockElements}
 
         <text x={padX} y={height - 6} className="fill-slate-500 text-[10px]">
           x = 0

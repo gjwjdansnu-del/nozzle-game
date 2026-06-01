@@ -6,6 +6,7 @@ import {
   velocity,
   staticPressure,
   stagnationDensity,
+  machFromPressureRatio,
 } from './gasDynamics'
 import { machAtStation, solveMachFromAreaRatio } from './quasi1d'
 import { shockMachDownstream, shockTotalPressureRatio } from './shockRelations'
@@ -229,7 +230,10 @@ function buildShockSolution(
   }
 }
 
-/** Unstarted: subsonic everywhere, throat not choked visually */
+/**
+ * Unstarted / unchoked: subsonic everywhere; exit static pressure ≈ pb.
+ * Mach field blends area–Mach geometry with pb-imposed exit Mach.
+ */
 function buildUnstartedSolution(
   geom: NozzleGeometry,
   p0: number,
@@ -240,6 +244,7 @@ function buildUnstartedSolution(
 ): Omit<FlowSolution, 'state' | 'pe' | 'pb' | 'Te' | 'rhoe' | 'Ue' | 'shockIndex' | 'shockX'> {
   const { x, areaRatio } = geom
   const n = x.length
+  const L = x[n - 1] || 1
   const Mach: number[] = []
   const pOverP0: number[] = []
   const TOverT0: number[] = []
@@ -247,25 +252,20 @@ function buildUnstartedSolution(
   const U: number[] = []
   const p0Local = Array(n).fill(p0)
 
-  // Cap Mach below 1 everywhere using max area ratio as subsonic limit
-  const maxAR = Math.max(...areaRatio)
-  const MMax = Math.min(0.85, solveMachFromAreaRatio(maxAR, gamma, false))
+  const prExit = Math.min(0.999, Math.max(1e-4, pb / p0))
+  const M_exit = machFromPressureRatio(prExit, gamma, false)
 
   for (let i = 0; i < n; i++) {
-    const M = Math.min(
-      solveMachFromAreaRatio(areaRatio[i], gamma, false),
-      MMax * (areaRatio[i] / maxAR),
-    )
-    Mach.push(Math.max(M, 0.01))
-    pOverP0.push(pressureRatio(Mach[i], gamma))
-    TOverT0.push(temperatureRatio(Mach[i], gamma))
-    rhoOverRho0.push(densityRatio(Mach[i], gamma))
-    U.push(velocity(Mach[i], T0 * TOverT0[i], gamma, R))
+    const M_geom = solveMachFromAreaRatio(areaRatio[i], gamma, false)
+    const t = L > 0 ? Math.pow(x[i] / L, 0.75) : 0
+    const M = (1 - t) * Math.min(M_geom, 0.95) + t * M_exit
+    const Mcl = Math.min(0.99, Math.max(0.02, M))
+    Mach.push(Mcl)
+    pOverP0.push(pressureRatio(Mcl, gamma))
+    TOverT0.push(temperatureRatio(Mcl, gamma))
+    rhoOverRho0.push(densityRatio(Mcl, gamma))
+    U.push(velocity(Mcl, T0 * temperatureRatio(Mcl, gamma), gamma, R))
   }
-
-  // Adjust last point pressure toward pb qualitatively
-  const pTarget = pb / p0
-  pOverP0[n - 1] = Math.min(pOverP0[n - 1], pTarget)
 
   return { x, Mach, pOverP0, TOverT0, rhoOverRho0, U, AeOverAt: geom.AeOverAt, p0Local }
 }
@@ -281,14 +281,18 @@ export function solveNozzleFlow(inputs: FlowInputs): FlowSolution {
   )
   if (pb >= p0 * 0.92 || pb > pInlet * 0.98) {
     const base = buildUnstartedSolution(geometry, p0, T0, gamma, R, pb)
+    const last = base.Mach.length - 1
+    const peUnstart = staticPressure(p0, base.Mach[last], gamma)
+    const TeUnstart = T0 * base.TOverT0[last]
+    const rho0 = stagnationDensity(p0, T0, R)
     return {
       ...base,
       state: 'unstarted',
-      pe,
+      pe: peUnstart,
       pb,
-      Te,
-      rhoe,
-      Ue,
+      Te: TeUnstart,
+      rhoe: rho0 * base.rhoOverRho0[last],
+      Ue: base.U[last],
       shockIndex: null,
       shockX: null,
     }
