@@ -5,10 +5,13 @@ import {
   temperatureRatio,
   velocity,
 } from './gasDynamics'
-import { classifyExpansion, type NozzleState } from './nozzleFlow'
 import type { MOCResult } from './moc2d'
-import { resampleMOCAxial } from './moc2d'
 import { prandtlMeyerNu } from './prandtlMeyer'
+import {
+  mocMassFlow,
+  resampleMOCAxialForGeometry,
+  type MOCGeometryType,
+} from './mocNozzle'
 
 export type MOCColormapVariable =
   | 'mach'
@@ -30,23 +33,11 @@ export interface MOCFlowDerived {
   rhoOverRho0: number[]
   U: number[]
   pe: number
-  pb: number
   Te: number
   Ue: number
-  state: NozzleState
-  mdotPerDepth: number
+  mdot: number
+  mdotLabel: string
   nuExit: number
-}
-
-export function mdotPerUnitDepth(
-  ht: number,
-  p0: number,
-  T0: number,
-  gamma: number,
-  R: number,
-): number {
-  const factor = Math.pow(2 / (gamma + 1), (gamma + 1) / (2 * (gamma - 1)))
-  return ht * p0 * Math.sqrt(gamma / (R * T0)) * factor
 }
 
 export function computeMOCFlowProperties(
@@ -56,14 +47,14 @@ export function computeMOCFlowProperties(
     ht: number
     p0: number
     T0: number
-    pb: number
     gamma: number
     R: number
+    geometryType: MOCGeometryType
     nSamples?: number
   },
 ): MOCFlowDerived {
-  const { Me, ht, p0, T0, pb, gamma, R, nSamples = 300 } = inputs
-  const axial = resampleMOCAxial(moc, nSamples)
+  const { Me, ht, p0, T0, gamma, R, geometryType, nSamples = 300 } = inputs
+  const axial = resampleMOCAxialForGeometry(moc, nSamples, geometryType)
 
   const pOverP0 = axial.M.map((M) => pressureRatio(M, gamma))
   const TOverT0 = axial.M.map((M) => temperatureRatio(M, gamma))
@@ -73,7 +64,7 @@ export function computeMOCFlowProperties(
   const pe = staticPressure(p0, Me, gamma)
   const Te = T0 * temperatureRatio(Me, gamma)
   const Ue = velocity(Me, Te, gamma, R)
-  const state = classifyExpansion(pe, pb)
+  const { value: mdot, label: mdotLabel } = mocMassFlow(ht, p0, T0, gamma, R, geometryType)
 
   return {
     ...axial,
@@ -83,11 +74,10 @@ export function computeMOCFlowProperties(
     rhoOverRho0,
     U,
     pe,
-    pb,
     Te,
     Ue,
-    state,
-    mdotPerDepth: mdotPerUnitDepth(ht, p0, T0, gamma, R),
+    mdot,
+    mdotLabel,
     nuExit: prandtlMeyerNu(Me, gamma),
   }
 }

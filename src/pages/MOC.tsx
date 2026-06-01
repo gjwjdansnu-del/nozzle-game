@@ -6,7 +6,7 @@ import { MOCOutputPanel } from '../components/MOCOutputPanel'
 import { MOCVisualization } from '../components/MOCVisualization'
 import { LinePlot } from '../components/LinePlot'
 import { barToPa, mmToM } from '../utils/units'
-import { generateMinimumLengthMOCNozzle } from '../utils/moc2d'
+import { generateMOCNozzle } from '../utils/mocNozzle'
 import { computeMOCFlowProperties } from '../utils/mocFlow'
 import { radToDeg } from '../utils/prandtlMeyer'
 
@@ -18,7 +18,7 @@ const DEFAULT: MOCInputs = {
   htMm: 10,
   p0Bar: 100,
   T0: 1500,
-  pbBar: 1,
+  geometryType: 'planar',
   colormap: 'mach',
   gamma: 1.4,
   R: 287,
@@ -31,28 +31,31 @@ export function MOC() {
 
   const derived = useMemo(() => {
     const p0 = barToPa(inputs.p0Bar)
-    const pb = barToPa(inputs.pbBar)
     const ht = mmToM(inputs.htMm)
-    const moc = generateMinimumLengthMOCNozzle({
+    const moc = generateMOCNozzle({
       Me: inputs.Me,
       nLines: Math.round(inputs.nLines),
       ht,
       gamma: inputs.gamma,
+      geometryType: inputs.geometryType,
     })
     const flow = computeMOCFlowProperties(moc, {
       Me: inputs.Me,
       ht,
       p0,
       T0: inputs.T0,
-      pb,
       gamma: inputs.gamma,
       R: inputs.R,
+      geometryType: inputs.geometryType,
       nSamples: GRID_SAMPLES,
     })
-    return { p0, pb, ht, moc, flow }
+    return { p0, ht, moc, flow }
   }, [inputs])
 
-  const { p0, pb, ht, moc, flow } = derived
+  const { p0, ht, moc, flow } = derived
+  const areaPlotLabel = inputs.geometryType === 'planar' ? 'A/At (h/ht)' : 'A/At (r/rt)²'
+  const wallPlotLabel =
+    inputs.geometryType === 'planar' ? 'y_wall (m)' : 'r_wall (m)'
 
   return (
     <div className="min-h-screen bg-[#0f1419]">
@@ -86,18 +89,13 @@ export function MOC() {
             R={inputs.R}
             htMm={inputs.htMm}
             nLines={Math.round(inputs.nLines)}
-            mdotPerDepth={flow.mdotPerDepth}
+            geometryType={inputs.geometryType}
+            mdot={flow.mdot}
+            mdotLabel={flow.mdotLabel}
           />
 
           <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-2">
-            <MOCVisualization
-              moc={moc}
-              flow={flow}
-              colormap={inputs.colormap}
-              Me={inputs.Me}
-              gamma={inputs.gamma}
-              ht={ht}
-            />
+            <MOCVisualization moc={moc} flow={flow} colormap={inputs.colormap} ht={ht} />
           </div>
 
           <MOCOutputPanel
@@ -108,14 +106,14 @@ export function MOC() {
             R={inputs.R}
             htMm={inputs.htMm}
             nLines={Math.round(inputs.nLines)}
-            mdotPerDepth={flow.mdotPerDepth}
+            geometryType={inputs.geometryType}
+            mdot={flow.mdot}
+            mdotLabel={flow.mdotLabel}
             moc={moc}
             Me={inputs.Me}
             pe={flow.pe}
             Te={flow.Te}
             Ue={flow.Ue}
-            pb={pb}
-            state={flow.state}
           />
         </div>
 
@@ -125,8 +123,8 @@ export function MOC() {
           </p>
           <div className="mx-auto max-w-3xl space-y-1">
             <LinePlot label="Mach" x={flow.x} y={flow.Mach} xMax={moc.L} color="#22d3ee" />
-            <LinePlot label="A/At" x={flow.x} y={flow.areaRatio} xMax={moc.L} color="#38bdf8" />
-            <LinePlot label="y_wall (m)" x={flow.x} y={flow.yWall} xMax={moc.L} color="#a3e635" />
+            <LinePlot label={areaPlotLabel} x={flow.x} y={flow.areaRatio} xMax={moc.L} color="#38bdf8" />
+            <LinePlot label={wallPlotLabel} x={flow.x} y={flow.yWall} xMax={moc.L} color="#a3e635" />
             <LinePlot
               label="θ_wall (deg)"
               x={flow.x}

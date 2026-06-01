@@ -1,9 +1,7 @@
 import type { MOCResult } from '../utils/moc2d'
 import type { MOCFlowDerived, MOCColormapVariable } from '../utils/mocFlow'
 import { mocColormapRange, mocColormapValue } from '../utils/mocFlow'
-import { obliqueShockAngleRad } from '../utils/obliqueShock'
 import {
-  PLOT_JET_WIDTH,
   PLOT_PAD_LEFT,
   PLOT_VIEW_WIDTH,
   axialToSvgX,
@@ -13,8 +11,6 @@ interface MOCVisualizationProps {
   moc: MOCResult
   flow: MOCFlowDerived
   colormap: MOCColormapVariable
-  Me: number
-  gamma: number
   ht: number
 }
 
@@ -26,21 +22,11 @@ function sampleColor(t: number): string {
   return `rgb(${r},${g},${b})`
 }
 
-const FAN_RAYS = 7
-
-export function MOCVisualization({
-  moc,
-  flow,
-  colormap,
-  Me,
-  gamma,
-  ht,
-}: MOCVisualizationProps) {
+export function MOCVisualization({ moc, flow, colormap, ht }: MOCVisualizationProps) {
   const width = PLOT_VIEW_WIDTH
   const height = 300
   const padX = PLOT_PAD_LEFT
   const padY = 28
-  const jetLen = PLOT_JET_WIDTH
   const L = moc.L || 1
 
   const yMax = Math.max(...moc.wallY, ht) * 1.05
@@ -76,22 +62,6 @@ export function MOCVisualization({
   }
 
   const xExit = toX(L)
-  const yTop = toY(moc.he)
-  const yBot = toY(-moc.he)
-  const halfH = (yBot - yTop) / 2
-  const pbOverPe = flow.pe > 0 ? flow.pb / flow.pe : 1
-  const peOverPb = flow.pb > 0 ? flow.pe / flow.pb : 1
-  const state = flow.state
-
-  const fanStrength = Math.min(1, Math.max(0, peOverPb - 1))
-  const fanSpreadMax = halfH * 0.85 * fanStrength
-  const showFan = state !== 'unstarted' && pbOverPe < 0.997 && fanStrength > 0.002
-
-  const betaRad = obliqueShockAngleRad(Me, gamma, pbOverPe)
-  const showShock = state !== 'unstarted' && pbOverPe > 1.001 && betaRad != null
-  const shockLen = jetLen * 0.95
-  const shockDx = betaRad != null ? shockLen * Math.cos(betaRad) : 0
-  const shockDy = betaRad != null ? shockLen * Math.sin(betaRad) : 0
 
   return (
     <div className="relative w-full">
@@ -147,67 +117,6 @@ export function MOCVisualization({
 
         <path d={outlineD} fill="none" stroke="#e2e8f0" strokeWidth={1.5} />
 
-        {showFan &&
-          Array.from({ length: FAN_RAYS }, (_, k) => {
-            const frac = k / (FAN_RAYS - 1)
-            const mu = Math.asin(1 / Math.max(Me, 1.01))
-            const turn = mu + frac * (Math.PI / 4) * fanStrength
-            const dx = jetLen * Math.cos(turn)
-            const dy = jetLen * Math.sin(turn)
-            return (
-              <g key={k}>
-                <line
-                  x1={xExit}
-                  y1={toY(moc.he)}
-                  x2={xExit + dx}
-                  y2={toY(moc.he) - dy}
-                  stroke="#fbbf24"
-                  strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.1 : 0.65}
-                  opacity={0.4 + 0.5 * frac}
-                />
-                <line
-                  x1={xExit}
-                  y1={toY(-moc.he)}
-                  x2={xExit + dx}
-                  y2={toY(-moc.he) + dy}
-                  stroke="#fbbf24"
-                  strokeWidth={k === 0 || k === FAN_RAYS - 1 ? 1.1 : 0.65}
-                  opacity={0.4 + 0.5 * frac}
-                />
-              </g>
-            )
-          })}
-
-        {showFan && (
-          <text x={xExit + 6} y={yTop - fanSpreadMax - 8} className="fill-amber-300 text-[10px]">
-            Expansion fan
-          </text>
-        )}
-
-        {showShock && (
-          <g>
-            <line
-              x1={xExit}
-              y1={yTop}
-              x2={xExit + shockDx}
-              y2={yTop + shockDy}
-              stroke="#fb923c"
-              strokeWidth={1.2}
-            />
-            <line
-              x1={xExit}
-              y1={yBot}
-              x2={xExit + shockDx}
-              y2={yBot - shockDy}
-              stroke="#fb923c"
-              strokeWidth={1.2}
-            />
-            <text x={xExit + shockDx + 4} y={yTop + shockDy + 10} className="fill-orange-300 text-[10px]">
-              Oblique shock
-            </text>
-          </g>
-        )}
-
         <text x={padX} y={height - 4} className="fill-slate-500 text-[10px]">
           throat
         </text>
@@ -215,7 +124,7 @@ export function MOCVisualization({
           exit
         </text>
         <text x={padX + 4} y={padY + 12} className="fill-slate-500 text-[9px]">
-          C− dashed · C+ solid gray
+          C− dashed · C+ solid · ideal expansion
         </text>
       </svg>
 

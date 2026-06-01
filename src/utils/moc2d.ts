@@ -42,6 +42,7 @@ export interface CharacteristicSegment {
 }
 
 export interface MOCResult {
+  geometryType?: 'planar' | 'axisymmetric'
   points: MOCPoint[]
   wallX: number[]
   wallY: number[]
@@ -313,6 +314,7 @@ function buildCharacteristicSegments(pts: InternalPoint[]): {
 export function resampleMOCAxial(
   result: MOCResult,
   nSamples: number,
+  geometryType: 'planar' | 'axisymmetric' = result.geometryType ?? 'planar',
 ): {
   x: number[]
   M: number[]
@@ -339,8 +341,10 @@ export function resampleMOCAxial(
   const nuWall = x.map((xi) => interp(result.wallX, result.wallNu, xi))
   const muWall = x.map((xi) => interp(result.wallX, result.wallMu, xi))
 
-  const ht = result.wallY[0] ?? 1
-  const areaRatio = yWall.map((h) => h / ht)
+  const rt = result.wallY[0] ?? 1
+  const areaRatio = yWall.map((r) =>
+    geometryType === 'planar' ? r / rt : (r / rt) * (r / rt),
+  )
 
   return { x, M, areaRatio, yWall, thetaWall, nuWall, muWall }
 }
@@ -375,6 +379,7 @@ export function generateMinimumLengthMOCNozzle(inputs: MOCInputs): MOCResult {
   const { cPlus, cMinus } = buildCharacteristicSegments(internal)
 
   return {
+    geometryType: 'planar',
     points: internal.map(toPublicPoint),
     wallX,
     wallY,

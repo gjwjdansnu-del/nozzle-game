@@ -1,6 +1,6 @@
 import { Slider } from './Slider'
-import { formatBar } from '../utils/units'
 import type { MOCColormapVariable } from '../utils/mocFlow'
+import type { MOCGeometryType } from '../utils/mocNozzle'
 
 export interface MOCInputs {
   Me: number
@@ -8,7 +8,7 @@ export interface MOCInputs {
   htMm: number
   p0Bar: number
   T0: number
-  pbBar: number
+  geometryType: MOCGeometryType
   colormap: MOCColormapVariable
   gamma: number
   R: number
@@ -27,6 +27,11 @@ export function MOCInputPanel({
   showAdvanced,
   onToggleAdvanced,
 }: MOCInputPanelProps) {
+  const throatLabel =
+    inputs.geometryType === 'planar'
+      ? 'Throat half-height ht (mm)'
+      : 'Throat radius rt (mm)'
+
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-4">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
@@ -57,21 +62,22 @@ export function MOCInputPanel({
           />
         </div>
 
-        <div className="sm:col-span-2">
-          <Slider
-            label="Back pressure pb"
-            value={inputs.pbBar}
-            min={0.01}
-            max={100}
-            step={0.01}
-            unit="bar"
-            displayValue={inputs.pbBar.toFixed(2)}
-            onChange={(v) => onChange({ pbBar: v })}
-          />
-        </div>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-slate-300">Geometry</span>
+          <select
+            value={inputs.geometryType}
+            onChange={(e) =>
+              onChange({ geometryType: e.target.value as MOCGeometryType })
+            }
+            className="rounded border border-slate-600 bg-slate-800 px-2 py-1"
+          >
+            <option value="planar">2D planar</option>
+            <option value="axisymmetric">Axisymmetric</option>
+          </select>
+        </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-300">Throat height ht (mm)</span>
+          <span className="text-slate-300">{throatLabel}</span>
           <input
             type="number"
             min={1}
@@ -125,10 +131,6 @@ export function MOCInputPanel({
             <option value="velocity">Velocity</option>
           </select>
         </label>
-
-        <div className="flex items-end text-sm text-slate-500">
-          2D planar MOC · axisymmetric (coming later)
-        </div>
       </div>
 
       <button
@@ -169,7 +171,7 @@ export function MOCInputPanel({
       )}
 
       <p className="mt-2 text-xs text-slate-500">
-        pb = {formatBar(inputs.pbBar * 1e5)} · minimum-length 2D nozzle
+        Ideal expansion at exit (pe from Me) · minimum-length MOC contour design
       </p>
     </div>
   )
