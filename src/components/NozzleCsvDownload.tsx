@@ -3,38 +3,41 @@ import {
   contourToCsv,
   downloadTextFile,
   wallArraysToContour,
-  type ContourPoint,
 } from '../utils/nozzleContourCsv'
 import { APP_VERSION } from '../version'
 
-interface NozzleCsvDownloadProps {
-  wallX: number[]
-  wallY: number[]
+interface NozzleContourPairDownloadProps {
+  inviscidX: number[]
+  inviscidY: number[]
+  blcX: number[]
+  blcY: number[]
   geometryType: MOCGeometryType
   Me: number
-  filename: string
-  label: string
   className?: string
 }
 
-export function NozzleCsvDownload({
-  wallX,
-  wallY,
+/** Download inviscid and BL-corrected wall contours as two CSV files. */
+export function NozzleContourPairDownload({
+  inviscidX,
+  inviscidY,
+  blcX,
+  blcY,
   geometryType,
   Me,
-  filename,
-  label,
   className = '',
-}: NozzleCsvDownloadProps) {
+}: NozzleContourPairDownloadProps) {
   const handleClick = () => {
-    const points: ContourPoint[] = wallArraysToContour(wallX, wallY)
-    const csv = contourToCsv(points, {
-      geometryType,
-      label,
-      Me,
-      version: APP_VERSION,
+    const meta = { geometryType, Me, version: APP_VERSION }
+    const inv = contourToCsv(wallArraysToContour(inviscidX, inviscidY), {
+      ...meta,
+      label: 'inviscid MOC wall',
     })
-    downloadTextFile(filename, csv)
+    const blc = contourToCsv(wallArraysToContour(blcX, blcY), {
+      ...meta,
+      label: 'BL-corrected wall',
+    })
+    downloadTextFile('nozzle_contour_inviscid.csv', inv)
+    downloadTextFile('nozzle_contour_blc.csv', blc)
   }
 
   return (
@@ -43,7 +46,7 @@ export function NozzleCsvDownload({
       onClick={handleClick}
       className={`rounded border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-cyan-400 hover:border-cyan-600 hover:text-cyan-200 ${className}`}
     >
-      Download CSV
+      Download CSV (inviscid + BLC)
     </button>
   )
 }

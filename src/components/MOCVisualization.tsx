@@ -12,6 +12,8 @@ interface MOCVisualizationProps {
   flow: MOCFlowDerived
   colormap: MOCColormapVariable
   ht: number
+  /** When set, draw dashed BLC outline over inviscid contour. */
+  blcWall?: { wallX: number[]; wallY: number[] }
 }
 
 function sampleColor(t: number): string {
@@ -22,14 +24,16 @@ function sampleColor(t: number): string {
   return `rgb(${r},${g},${b})`
 }
 
-export function MOCVisualization({ moc, flow, colormap, ht }: MOCVisualizationProps) {
+export function MOCVisualization({ moc, flow, colormap, ht, blcWall }: MOCVisualizationProps) {
   const width = PLOT_VIEW_WIDTH
   const height = 300
   const padX = PLOT_PAD_LEFT
   const padY = 28
-  const L = moc.L || 1
+  const blcX = blcWall?.wallX
+  const blcY = blcWall?.wallY
+  const L = Math.max(moc.L, ...(blcX ?? []), 1e-9)
 
-  const yMax = Math.max(...moc.wallY, ht) * 1.05
+  const yMax = Math.max(...moc.wallY, ...(blcY ?? []), ht) * 1.05
   const yScale = ((height - padY * 2) * 0.42) / yMax
 
   const toX = (xi: number) => axialToSvgX(xi, L)
@@ -49,6 +53,25 @@ export function MOCVisualization({ moc, flow, colormap, ht }: MOCVisualizationPr
       .map((p) => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`),
     'Z',
   ].join(' ')
+
+  const blcOutlineD =
+    blcX && blcY
+      ? [
+          ...blcX.map((x, i) => {
+            const px = toX(x)
+            const py = toY(blcY[i])
+            return `${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`
+          }),
+          ...blcX
+            .slice()
+            .reverse()
+            .map((x, i) => {
+              const yi = blcY[blcY.length - 1 - i]
+              return `L ${toX(x).toFixed(1)} ${toY(-yi).toFixed(1)}`
+            }),
+          'Z',
+        ].join(' ')
+      : null
 
   const strips: { x: number; w: number; color: string }[] = []
   for (let i = 0; i < nStrips - 1; i++) {
@@ -115,6 +138,16 @@ export function MOCVisualization({ moc, flow, colormap, ht }: MOCVisualizationPr
           />
         ))}
 
+        {blcOutlineD && (
+          <path
+            d={blcOutlineD}
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth={1.8}
+            strokeDasharray="6 3"
+          />
+        )}
+
         <path d={outlineD} fill="none" stroke="#e2e8f0" strokeWidth={1.5} />
 
         <text x={padX} y={height - 4} className="fill-slate-500 text-[10px]">
@@ -124,7 +157,9 @@ export function MOCVisualization({ moc, flow, colormap, ht }: MOCVisualizationPr
           exit
         </text>
         <text x={padX + 4} y={padY + 12} className="fill-slate-500 text-[9px]">
-          C− dashed · C+ solid · ideal expansion
+          {blcOutlineD
+            ? 'solid inviscid · dashed BLC · C− dashed'
+            : 'C− dashed · C+ solid · ideal expansion'}
         </text>
       </svg>
 

@@ -21,14 +21,8 @@ export function Home() {
         />
         <ModeCard
           title="MOC Nozzle Design"
-          description="Method of characteristics for 2D planar and axisymmetric minimum-length nozzle contours."
+          description="Minimum-length MOC for 2D planar and axisymmetric nozzles, optional BL displacement correction, dual CSV export."
           to="/moc"
-          badges={['2D', '3D']}
-        />
-        <ModeCard
-          title="MOC + Boundary-Layer Correction"
-          description="MOC design with Edenfield displacement-thickness BL correction and CSV export."
-          to="/moc-bl-correction"
           badges={['2D', '3D']}
         />
         <ModeCard

@@ -4,12 +4,16 @@ import { AppVersion } from '../components/AppVersion'
 import { MOCInputPanel, type MOCInputs } from '../components/MOCInputPanel'
 import { MOCOutputPanel } from '../components/MOCOutputPanel'
 import { MOCVisualization } from '../components/MOCVisualization'
+import { NozzleContourPairDownload } from '../components/NozzleCsvDownload'
 import { LinePlot } from '../components/LinePlot'
-import { barToPa, mmToM } from '../utils/units'
-import { generateMOCNozzle } from '../utils/mocNozzle'
+import {
+  applyBoundaryLayerCorrection,
+  defaultBoundaryLayerOrigin,
+} from '../utils/mocBoundaryLayer'
 import { computeMOCFlowProperties } from '../utils/mocFlow'
-import { NozzleCsvDownload } from '../components/NozzleCsvDownload'
+import { generateMOCNozzle } from '../utils/mocNozzle'
 import { radToDeg } from '../utils/prandtlMeyer'
+import { barToPa, mmToM, mToMm } from '../utils/units'
 
 const GRID_SAMPLES = 300
 
@@ -23,6 +27,9 @@ const DEFAULT: MOCInputs = {
   colormap: 'mach',
   gamma: 1.4,
   R: 287,
+  blEnabled: false,
+  blMethod: 'edenfield',
+  blStartMm: 0,
 }
 
 export function MOC() {
@@ -50,13 +57,25 @@ export function MOC() {
       geometryType: inputs.geometryType,
       nSamples: GRID_SAMPLES,
     })
-    return { p0, ht, moc, flow }
+    const x0Auto = defaultBoundaryLayerOrigin(moc)
+    const blc = applyBoundaryLayerCorrection(moc, {
+      method: inputs.blMethod,
+      x0: mmToM(inputs.blStartMm),
+      p0,
+      T0: inputs.T0,
+      gamma: inputs.gamma,
+      R: inputs.R,
+      Me: inputs.Me,
+    })
+    return { p0, ht, moc, flow, blc, x0Auto }
   }, [inputs])
 
-  const { p0, ht, moc, flow } = derived
+  const { p0, ht, moc, flow, blc, x0Auto } = derived
+  const Lplot = Math.max(moc.L, ...blc.wallX)
   const areaPlotLabel = inputs.geometryType === 'planar' ? 'A/At (h/ht)' : 'A/At (r/rt)²'
   const wallPlotLabel =
     inputs.geometryType === 'planar' ? 'y_wall (m)' : 'r_wall (m)'
+  const deltaAtExit = blc.delta[blc.delta.length - 1] ?? 0
 
   return (
     <div className="min-h-screen bg-[#0f1419]">
@@ -79,18 +98,21 @@ export function MOC() {
           onChange={patch}
           showAdvanced={showAdvanced}
           onToggleAdvanced={() => setShowAdvanced((v) => !v)}
+          autoBlStartMm={mToMm(x0Auto)}
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <NozzleCsvDownload
-            wallX={moc.wallX}
-            wallY={moc.wallY}
+          <NozzleContourPairDownload
+            inviscidX={moc.wallX}
+            inviscidY={moc.wallY}
+            blcX={blc.wallX}
+            blcY={blc.wallY}
             geometryType={inputs.geometryType}
             Me={inputs.Me}
-            filename="nozzle_contour.csv"
-            label="MOC inviscid wall contour"
           />
-          <span className="text-xs text-slate-500">Upper meridional wall (x, y or r) in metres</span>
+          <span className="text-xs text-slate-500">
+            Two files: nozzle_contour_inviscid.csv and nozzle_contour_blc.csv
+          </span>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr_220px]">
@@ -108,60 +130,111 @@ export function MOC() {
           />
 
           <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-2">
-            <MOCVisualization moc={moc} flow={flow} colormap={inputs.colormap} ht={ht} />
+            <MOCVisualization
+              moc={moc}
+              flow={flow}
+              colormap={inputs.colormap}
+              ht={ht}
+              blcWall={
+                inputs.blEnabled
+                  ? { wallX: blc.wallX, wallY: blc.wallY }
+                  : undefined
+              }
+            />
           </div>
 
-          <MOCOutputPanel
-            side="outlet"
-            p0={p0}
-            T0={inputs.T0}
-            gamma={inputs.gamma}
-            R={inputs.R}
-            htMm={inputs.htMm}
-            nLines={Math.round(inputs.nLines)}
-            geometryType={inputs.geometryType}
-            mdot={flow.mdot}
-            mdotLabel={flow.mdotLabel}
-            moc={moc}
-            Me={inputs.Me}
-            pe={flow.pe}
-            Te={flow.Te}
-            Ue={flow.Ue}
-          />
+          <div className="space-y-4">
+            {inputs.blEnabled && (
+              <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 p-4 text-sm">
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-200/80">
+                  BL correction
+                </h3>
+                <div className="space-y-1.5 text-slate-300">
+                  <p className="flex justify-between">
+                    <span className="text-slate-400">Method</span>
+                    <span className="font-mono">{blc.method}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-slate-400">x0</span>
+                    <span className="font-mono">{mToMm(blc.x0).toFixed(2)} mm</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-slate-400">δ at exit</span>
+                    <span className="font-mono">{(deltaAtExit * 1e3).toFixed(3)} mm</span>
+                  </p>
+                </div>
+              </div>
+            )}
+            <MOCOutputPanel
+              side="outlet"
+              p0={p0}
+              T0={inputs.T0}
+              gamma={inputs.gamma}
+              R={inputs.R}
+              htMm={inputs.htMm}
+              nLines={Math.round(inputs.nLines)}
+              geometryType={inputs.geometryType}
+              mdot={flow.mdot}
+              mdotLabel={flow.mdotLabel}
+              moc={moc}
+              Me={inputs.Me}
+              pe={flow.pe}
+              Te={flow.Te}
+              Ue={flow.Ue}
+            />
+          </div>
         </div>
 
         <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
           <p className="mb-2 text-xs text-slate-500">
-            Axial distributions (x aligned with MOC nozzle above)
+            Axial distributions (inviscid MOC; x aligned with nozzle above)
           </p>
           <div className="mx-auto max-w-3xl space-y-1">
-            <LinePlot label="Mach" x={flow.x} y={flow.Mach} xMax={moc.L} color="#22d3ee" />
-            <LinePlot label={areaPlotLabel} x={flow.x} y={flow.areaRatio} xMax={moc.L} color="#38bdf8" />
-            <LinePlot label={wallPlotLabel} x={flow.x} y={flow.yWall} xMax={moc.L} color="#a3e635" />
+            <LinePlot label="Mach (centerline)" x={flow.x} y={flow.Mach} xMax={Lplot} color="#22d3ee" />
+            <LinePlot label={areaPlotLabel} x={flow.x} y={flow.areaRatio} xMax={Lplot} color="#38bdf8" />
+            <LinePlot label={wallPlotLabel} x={flow.x} y={flow.yWall} xMax={Lplot} color="#a3e635" />
             <LinePlot
               label="θ_wall (deg)"
               x={flow.x}
               y={flow.thetaWall.map((t) => radToDeg(t))}
-              xMax={moc.L}
+              xMax={Lplot}
               color="#f472b6"
             />
             <LinePlot
               label="ν (deg)"
               x={flow.x}
               y={flow.nuWall.map((n) => radToDeg(n))}
-              xMax={moc.L}
+              xMax={Lplot}
               color="#c084fc"
             />
             <LinePlot
               label="μ (deg)"
               x={flow.x}
               y={flow.muWall.map((m) => radToDeg(m))}
-              xMax={moc.L}
+              xMax={Lplot}
               color="#fb7185"
             />
-            <LinePlot label="p/p0" x={flow.x} y={flow.pOverP0} xMax={moc.L} color="#a78bfa" />
-            <LinePlot label="T/T0" x={flow.x} y={flow.TOverT0} xMax={moc.L} color="#f472b6" />
-            <LinePlot label="Velocity (m/s)" x={flow.x} y={flow.U} xMax={moc.L} color="#fbbf24" />
+            <LinePlot label="p/p0" x={flow.x} y={flow.pOverP0} xMax={Lplot} color="#a78bfa" />
+            <LinePlot label="T/T0" x={flow.x} y={flow.TOverT0} xMax={Lplot} color="#f472b6" />
+            <LinePlot label="Velocity (m/s)" x={flow.x} y={flow.U} xMax={Lplot} color="#fbbf24" />
+            {inputs.blEnabled && (
+              <>
+                <LinePlot
+                  label="δ (mm) on wall"
+                  x={moc.wallX}
+                  y={blc.delta.map((d) => d * 1e3)}
+                  xMax={Lplot}
+                  color="#fbbf24"
+                />
+                <LinePlot
+                  label={`${wallPlotLabel} (BLC)`}
+                  x={blc.wallX}
+                  y={blc.wallY}
+                  xMax={Lplot}
+                  color="#fbbf24"
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

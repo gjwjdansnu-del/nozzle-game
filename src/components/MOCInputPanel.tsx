@@ -1,4 +1,5 @@
 import { Slider } from './Slider'
+import type { BLMethod } from '../utils/mocBoundaryLayer'
 import type { MOCColormapVariable } from '../utils/mocFlow'
 import type { MOCGeometryType } from '../utils/mocNozzle'
 
@@ -12,6 +13,9 @@ export interface MOCInputs {
   colormap: MOCColormapVariable
   gamma: number
   R: number
+  blEnabled: boolean
+  blMethod: BLMethod
+  blStartMm: number
 }
 
 interface MOCInputPanelProps {
@@ -19,6 +23,7 @@ interface MOCInputPanelProps {
   onChange: (patch: Partial<MOCInputs>) => void
   showAdvanced: boolean
   onToggleAdvanced: () => void
+  autoBlStartMm?: number
 }
 
 export function MOCInputPanel({
@@ -26,6 +31,7 @@ export function MOCInputPanel({
   onChange,
   showAdvanced,
   onToggleAdvanced,
+  autoBlStartMm,
 }: MOCInputPanelProps) {
   const throatLabel =
     inputs.geometryType === 'planar'
@@ -170,8 +176,54 @@ export function MOCInputPanel({
         </div>
       )}
 
+      <div className="mt-4 border-t border-slate-700 pt-4">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={inputs.blEnabled}
+            onChange={(e) => onChange({ blEnabled: e.target.checked })}
+            className="rounded border-slate-600"
+          />
+          Show boundary-layer correction (displacement thickness)
+        </label>
+
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-300">BL method (for CSV & overlay)</span>
+            <select
+              value={inputs.blMethod}
+              onChange={(e) =>
+                onChange({ blMethod: e.target.value as BLMethod })
+              }
+              className="rounded border border-slate-600 bg-slate-800 px-2 py-1"
+            >
+              <option value="edenfield">Edenfield (1968)</option>
+              <option value="linear">Linear in Me</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-slate-300">BL start x0 (mm)</span>
+            <input
+              type="number"
+              min={0}
+              max={500}
+              step={0.1}
+              value={inputs.blStartMm}
+              onChange={(e) => onChange({ blStartMm: Number(e.target.value) })}
+              className="rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono"
+            />
+            {autoBlStartMm != null && (
+              <span className="text-[10px] text-slate-500">
+                throat ≈ {autoBlStartMm.toFixed(2)} mm
+              </span>
+            )}
+          </label>
+        </div>
+      </div>
+
       <p className="mt-2 text-xs text-slate-500">
-        Ideal expansion at exit (pe from Me) · minimum-length MOC contour design
+        Ideal expansion at exit · minimum-length MOC · CSV exports inviscid + BL contours together
       </p>
     </div>
   )
