@@ -8,6 +8,7 @@ import { LinePlot } from '../components/LinePlot'
 import { barToPa, mmToM } from '../utils/units'
 import { generateMOCNozzle } from '../utils/mocNozzle'
 import { computeMOCFlowProperties } from '../utils/mocFlow'
+import { NozzleCsvDownload } from '../components/NozzleCsvDownload'
 import { radToDeg } from '../utils/prandtlMeyer'
 
 const GRID_SAMPLES = 300
@@ -79,6 +80,18 @@ export function MOC() {
           showAdvanced={showAdvanced}
           onToggleAdvanced={() => setShowAdvanced((v) => !v)}
         />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <NozzleCsvDownload
+            wallX={moc.wallX}
+            wallY={moc.wallY}
+            geometryType={inputs.geometryType}
+            Me={inputs.Me}
+            filename="nozzle_contour.csv"
+            label="MOC inviscid wall contour"
+          />
+          <span className="text-xs text-slate-500">Upper meridional wall (x, y or r) in metres</span>
+        </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr_220px]">
           <MOCOutputPanel
