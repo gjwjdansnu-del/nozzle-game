@@ -65,7 +65,7 @@ export interface MOCResult {
   cMinusSegments: CharacteristicSegment[]
 }
 
-interface InternalPoint {
+export interface InternalPoint {
   index: number
   x: number
   y: number
@@ -85,7 +85,7 @@ export function countMOCPoints(nLines: number): number {
   return nLines + (nLines * (nLines + 1)) / 2
 }
 
-function findXY(
+export function findXY(
   xyTop: [number, number],
   xyBot: [number, number],
   cNeg: number,
@@ -108,7 +108,7 @@ function angleDivs(maxAngle: number, nLines: number): number[] {
   return Array.from({ length: nLines }, (_, i) => d * i)
 }
 
-function initMOCMesh(nPoints: number, nLines: number): InternalPoint[] {
+export function initMOCMesh(nPoints: number, nLines: number): InternalPoint[] {
   const pts: InternalPoint[] = []
   let j = nLines
   let k = 0

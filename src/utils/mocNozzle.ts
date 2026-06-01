@@ -1,10 +1,9 @@
 /**
- * MOC nozzle facade: 2D planar vs axisymmetric post-processing on the same
- * meridional (x–r) minimum-length characteristic mesh.
+ * MOC nozzle facade: planar (2D) vs axisymmetric minimum-length solvers.
  */
 
-import { areaMachRatio } from './gasDynamics'
 import { chokedMassFlow } from './gasDynamics'
+import { generateMinimumLengthAxisymmetricMOCNozzle } from './mocAxisymmetric'
 import {
   generateMinimumLengthMOCNozzle,
   resampleMOCAxial,
@@ -28,18 +27,11 @@ export function geometricAreaRatio(
 }
 
 export function generateMOCNozzle(inputs: MOCNozzleInputs): MOCResult {
-  const base = generateMinimumLengthMOCNozzle(inputs)
-  const rt = inputs.ht
-  const re = base.he
-  const AeOverAtGeometric = geometricAreaRatio(re, rt, inputs.geometryType)
-  const AeOverAtIdeal = areaMachRatio(inputs.Me, inputs.gamma)
-
-  return {
-    ...base,
-    geometryType: inputs.geometryType,
-    AeOverAtGeometric,
-    AeOverAtIdeal,
+  if (inputs.geometryType === 'axisymmetric') {
+    return generateMinimumLengthAxisymmetricMOCNozzle(inputs)
   }
+  const base = generateMinimumLengthMOCNozzle(inputs)
+  return { ...base, geometryType: 'planar' }
 }
 
 export function mocMassFlow(
