@@ -37,18 +37,17 @@ export function InputPanel({
         Design controls
       </h3>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-slate-300">Exit Mach Me</span>
-          <input
-            type="number"
+        <div className="sm:col-span-2">
+          <Slider
+            label="Exit Mach Me"
+            value={inputs.Me}
             min={1.01}
             max={10}
-            step={0.1}
-            value={inputs.Me}
-            onChange={(e) => onChange({ Me: Number(e.target.value) })}
-            className="rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono text-cyan-200"
+            step={0.05}
+            displayValue={inputs.Me.toFixed(2)}
+            onChange={(v) => onChange({ Me: v })}
           />
-        </label>
+        </div>
 
         <div className="sm:col-span-2">
           <Slider

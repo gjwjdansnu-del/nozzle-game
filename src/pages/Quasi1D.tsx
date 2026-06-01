@@ -100,6 +100,8 @@ export function Quasi1D() {
               solution={solution}
               colormap={inputs.colormap}
               L={L}
+              Me={inputs.Me}
+              gamma={inputs.gamma}
             />
           </div>
 
@@ -127,7 +129,7 @@ export function Quasi1D() {
           <p className="mb-2 text-xs text-slate-500">
             Axial distributions (x aligned with nozzle above)
           </p>
-          <div className="space-y-1">
+          <div className="mx-auto max-w-3xl space-y-1">
             <LinePlot
               label="Mach"
               x={solution.x}

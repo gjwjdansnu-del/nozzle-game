@@ -1,3 +1,5 @@
+import { PLOT_VIEW_WIDTH, axialToSvgX } from '../utils/plotLayout'
+
 interface LinePlotProps {
   label: string
   x: number[]
@@ -17,19 +19,16 @@ export function LinePlot({
   shockX = null,
   height = 72,
 }: LinePlotProps) {
-  const width = 800
-  const padL = 48
-  const padR = 8
+  const width = PLOT_VIEW_WIDTH
   const padT = 8
   const padB = 20
-  const plotW = width - padL - padR
   const plotH = height - padT - padB
 
   const yMin = Math.min(...y)
   const yMax = Math.max(...y)
   const yRange = yMax - yMin || 1
 
-  const toX = (xi: number) => padL + (xi / xMax) * plotW
+  const toX = (xi: number) => axialToSvgX(xi, xMax)
   const toY = (yi: number) => padT + plotH - ((yi - yMin) / yRange) * plotH
 
   const pathD = x
@@ -59,13 +58,13 @@ export function LinePlot({
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full text-slate-600"
-        preserveAspectRatio="none"
+        className="mx-auto w-full max-w-3xl text-slate-600"
+        preserveAspectRatio="xMidYMid meet"
       >
         <line
-          x1={padL}
+          x1={toX(0)}
           y1={padT + plotH}
-          x2={padL + plotW}
+          x2={toX(xMax)}
           y2={padT + plotH}
           stroke="currentColor"
           strokeWidth={0.5}

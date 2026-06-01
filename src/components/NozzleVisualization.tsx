@@ -1,13 +1,22 @@
 import type { FlowSolution, NozzleState } from '../utils/nozzleFlow'
-import { colormapRange, colormapValue, pressureMismatch } from '../utils/nozzleFlow'
+import { colormapRange, colormapValue } from '../utils/nozzleFlow'
 import type { ColormapVariable } from '../utils/nozzleFlow'
 import type { NozzleGeometry } from '../utils/nozzleGeometry'
+import { lipShockNormalFraction } from '../utils/obliqueShock'
+import {
+  PLOT_JET_WIDTH,
+  PLOT_PAD_LEFT,
+  PLOT_VIEW_WIDTH,
+  axialToSvgX,
+} from '../utils/plotLayout'
 
 interface NozzleVisualizationProps {
   geometry: NozzleGeometry
   solution: FlowSolution
   colormap: ColormapVariable
   L: number
+  Me: number
+  gamma: number
 }
 
 function jetColor(state: NozzleState): string {
@@ -23,7 +32,6 @@ function jetColor(state: NozzleState): string {
   }
 }
 
-/** Simple blue→red colormap */
 function sampleColor(t: number): string {
   const clamped = Math.max(0, Math.min(1, t))
   const r = Math.round(255 * clamped)
@@ -37,17 +45,18 @@ export function NozzleVisualization({
   solution,
   colormap,
   L,
+  Me,
+  gamma,
 }: NozzleVisualizationProps) {
-  const width = 900
+  const width = PLOT_VIEW_WIDTH
   const height = 280
-  const padX = 40
+  const padX = PLOT_PAD_LEFT
   const padY = 30
-  const jetLen = 120
-  const plotW = width - padX * 2 - jetLen
+  const jetLen = PLOT_JET_WIDTH
   const plotH = height - padY * 2
   const yScale = (plotH * 0.42) / Math.max(...geometry.yWall, 0.01)
 
-  const toX = (xi: number) => padX + (xi / L) * plotW
+  const toX = (xi: number) => axialToSvgX(xi, L)
   const toY = (yi: number) => height / 2 - yi * yScale
 
   const [cMin, cMax] = colormapRange(colormap, solution)
@@ -76,25 +85,32 @@ export function NozzleVisualization({
   const xExit = toX(L)
   const yTop = toY(geometry.yWall[n - 1])
   const yBot = toY(-geometry.yWall[n - 1])
-  const mismatch = pressureMismatch(solution.pe, solution.pb)
+  const halfH = (yTop - yBot) / 2
   const state = solution.state
+  const pbOverPe = solution.pe > 0 ? solution.pb / solution.pe : 1
+  const peOverPb = solution.pb > 0 ? solution.pe / solution.pb : 1
 
   const showExternalJet =
     state !== 'internal-shock' && state !== 'unstarted'
 
-  const fanSpread = Math.min(35, 8 + Math.abs(mismatch) * 25)
-  const shockAngle = Math.min(50, 10 + Math.abs(mismatch) * 30)
+  // Continuous fan spread for underexpanded (pb < pe)
+  const fanSpread = Math.min(halfH * 0.85, halfH * 0.15 * Math.max(0, peOverPb - 1))
+
+  // Oblique lip shock: β grows smoothly from Mach angle → 90° as pb/pe increases
+  const lipNormal = lipShockNormalFraction(Me, gamma, pbOverPe)
+  const shockDx = jetLen * Math.max(0.05, 1 - lipNormal)
+  const shockDy = halfH * 0.35 * lipNormal
 
   const jetElements = showExternalJet ? (
     <g>
-      {state === 'underexpanded' && (
+      {pbOverPe < 0.997 && (
         <>
           <line
             x1={xExit}
             y1={yTop}
             x2={xExit + jetLen}
             y2={yTop - fanSpread}
-            stroke={jetColor(state)}
+            stroke={jetColor('underexpanded')}
             strokeWidth={1.2}
             opacity={0.85}
           />
@@ -103,60 +119,54 @@ export function NozzleVisualization({
             y1={yBot}
             x2={xExit + jetLen}
             y2={yBot + fanSpread}
-            stroke={jetColor(state)}
+            stroke={jetColor('underexpanded')}
             strokeWidth={1.2}
             opacity={0.85}
           />
-          <line
-            x1={xExit}
-            y1={(yTop + yBot) / 2}
-            x2={xExit + jetLen * 0.85}
-            y2={(yTop + yBot) / 2}
-            stroke={jetColor(state)}
-            strokeWidth={1}
-            opacity={0.5}
-          />
         </>
       )}
-      {state === 'ideally-expanded' && (
+      {pbOverPe >= 0.997 && pbOverPe <= 1.03 && (
         <rect
           x={xExit}
           y={yBot}
           width={jetLen}
           height={yTop - yBot}
-          fill={jetColor(state)}
+          fill={jetColor('ideally-expanded')}
           opacity={0.15}
-          stroke={jetColor(state)}
+          stroke={jetColor('ideally-expanded')}
           strokeWidth={0.8}
         />
       )}
-      {state === 'overexpanded' && (
+      {pbOverPe > 1.001 && (
         <>
           <line
             x1={xExit}
             y1={yTop}
-            x2={xExit + jetLen * 0.7}
-            y2={yTop + shockAngle * 0.4}
-            stroke={jetColor(state)}
+            x2={xExit + shockDx}
+            y2={yTop + shockDy}
+            stroke={jetColor('overexpanded')}
             strokeWidth={1.2}
           />
           <line
             x1={xExit}
             y1={yBot}
-            x2={xExit + jetLen * 0.7}
-            y2={yBot - shockAngle * 0.4}
-            stroke={jetColor(state)}
+            x2={xExit + shockDx}
+            y2={yBot - shockDy}
+            stroke={jetColor('overexpanded')}
             strokeWidth={1.2}
           />
-          <line
-            x1={xExit + jetLen * 0.7}
-            y1={yTop + shockAngle * 0.4}
-            x2={xExit + jetLen * 0.7}
-            y2={yBot - shockAngle * 0.4}
-            stroke={jetColor(state)}
-            strokeWidth={0.8}
-            strokeDasharray="3 2"
-          />
+          {lipNormal > 0.55 && (
+            <line
+              x1={xExit + shockDx}
+              y1={yTop + shockDy}
+              x2={xExit + shockDx}
+              y2={yBot - shockDy}
+              stroke={jetColor('overexpanded')}
+              strokeWidth={0.8}
+              strokeDasharray="3 2"
+              opacity={0.5 + 0.5 * lipNormal}
+            />
+          )}
         </>
       )}
     </g>
@@ -184,7 +194,11 @@ export function NozzleVisualization({
           Nozzle may be unstarted / choking failure
         </div>
       )}
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="mx-auto w-full max-w-3xl"
+        preserveAspectRatio="xMidYMid meet"
+      >
         <defs>
           <clipPath id="nozzle-clip">
             <path d={outlineD} />
@@ -218,10 +232,7 @@ export function NozzleVisualization({
 
       <div className="absolute right-2 top-8 flex flex-col items-center gap-1">
         <span className="text-[10px] text-slate-400">{cMax.toFixed(2)}</span>
-        <div
-          className="w-3 rounded border border-slate-600"
-          style={{ height: colorbarH }}
-        >
+        <div className="w-3 rounded border border-slate-600" style={{ height: colorbarH }}>
           {Array.from({ length: colorbarSteps }, (_, i) => (
             <div
               key={i}
